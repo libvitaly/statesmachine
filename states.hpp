@@ -41,19 +41,19 @@ private:
     C &_context;
 };
 
-template<typename S>
+//template<typename S>
+template<typename E, typename C>
 class StateMachine
 {
 protected:    
-    using E = typename S::EventType;
-    using C = typename S::ContextType;
+    using S = State<E, C>;
 public:
     StateMachine(C *context): _context(context), _current_state(nullptr){}
     ~StateMachine()
     {
         stop();
         wait();
-        for(auto& s : _states) {
+        for(auto& s: _states) {
             delete s;
         }
     }
@@ -68,7 +68,6 @@ public:
         }
         _current_state = state;
         _context->_out = _current_state->name();
-        //std::cout << "--" << ": " << _current_state->name() << " = " << _context->_out << std::endl;
         _thread = std::thread([this](){
             _continue_flag = true;
             while(_continue_flag)
@@ -77,10 +76,8 @@ public:
                 if(event != E{}){
                     onEvent(event);
                     _context->_out += ", " + _current_state->name();
-                    //std::cout << event << ": " << _current_state->name() << " = " << _context->_out << std::endl;
                 }else{
                     _continue_flag = false;
-                    //std::cout << "ex: -- = " << _context->_out << ", end" << std::endl;
                 } 
             }
         });

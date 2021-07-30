@@ -27,8 +27,8 @@ TEST(state_machine, run)
 
     using Event = std::string;
 
-    fsm::StateMachine<fsm::State<Event, Context>> state_machine(&context);
-
+    fsm::StateMachine<Event, Context> state_machine(&context);
+    
     auto s0 = state_machine.createState("s0");
     auto s1 = state_machine.createState("s1");
     auto s2 = state_machine.createState("s2");
