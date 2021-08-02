@@ -7,6 +7,7 @@
 #include <thread>
 #include <string>
 
+
 TEST(queue, total) {
 
   struct Foobar{int _v; std::string _text;};
@@ -32,12 +33,17 @@ TEST(queue, total) {
   auto t2 = std::thread([&q, &foobar, timeout](){
     for(auto const& item: foobar){
       auto curr = q.dequeue();
-      ASSERT_EQ(curr._v, item._v);
-      EXPECT_STREQ(curr._text.c_str(), item._text.c_str());
-      std::this_thread::sleep_for(std::chrono::milliseconds(timeout/3));
+      if(curr)
+      {
+        ASSERT_EQ(curr.value()._v, item._v);
+        EXPECT_STREQ(curr.value()._text.c_str(), item._text.c_str());
+        std::this_thread::sleep_for(std::chrono::milliseconds(timeout/3));
+      }
     }
   });
 
   t1.join();
   t2.join();
+
+  ASSERT_EQ(q.size(), 0);
 }

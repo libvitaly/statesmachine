@@ -17,10 +17,8 @@ namespace fsm
 template<typename E, typename C>
 class State
 {
-    std::string _name;
+    const std::string _name;
 public:
-    using EventType = E;
-    using ContextType = C;
     State( C& c, std::string const& name_): _name(name_), _context(c){}
     std::string const& name() const { return _name; }
     using Predicate = std::function<bool(const E&)>;
@@ -41,14 +39,12 @@ private:
     C &_context;
 };
 
-//template<typename S>
 template<typename E, typename C>
 class StateMachine
-{
-protected:    
+{   
     using S = State<E, C>;
 public:
-    StateMachine(C *context): _context(context), _current_state(nullptr){}
+    StateMachine(std::shared_ptr<C> context): _context(context), _current_state(nullptr){}
     ~StateMachine()
     {
         stop();
@@ -62,28 +58,28 @@ public:
         if(_context == nullptr) throw std::runtime_error("unknown context");
         return static_cast<S*>(*_states.insert(new S{*_context, std::forward<Args>(args)...}).first);
     }
-    void run(S* state) {
-        if(!state || !_states.count(state)) {
+    //async event processing
+    void run(S* start_state, S* exit_state)
+    {
+        if(!start_state || !_states.count(start_state)) {
             throw std::runtime_error{"invalid state"};
         }
-        _current_state = state;
+        _current_state = start_state;
+#ifdef GTEST_ON                 
         _context->_out = _current_state->name();
-        _thread = std::thread([this](){
-            _continue_flag = true;
-            while(_continue_flag)
-            {
-                auto event = _queue.dequeue();
-                if(event != E{}){
-                    onEvent(event);
-                    _context->_out += ", " + _current_state->name();
-                }else{
-                    _continue_flag = false;
-                } 
+#endif //#ifdef GTEST_ON        
+        _thread = std::thread([this, exit_state](){
+            while(auto event = _queue.dequeue())
+            { 
+                onEvent(event.value());
+#ifdef GTEST_ON             
+                _context->_out += ", " + _current_state->name();     
+#endif //#ifdef GTEST_ON                
+                if(_current_state == exit_state) break;
             }
         });
     }
     void stop() {
-        _continue_flag = false;
         _queue.wakeup();
     }
     void wait() {
@@ -92,26 +88,28 @@ public:
     void pushEvent(const E& event) {
         _queue.enqueue(event);
     }
-    S const& currentState() {return *_current_state; }
-protected:
+    //sync event processing
     void onEvent(const E& event) {
         const auto old_state = _current_state;
         _current_state = _current_state->onEvent(event);
         if(!_states.count(_current_state)) {
             throw std::runtime_error("invalid state");
         }
-        // if(old_state != _current_state)
-        // {
-        //     std::cout << old_state->name() << "(" << event << ") -> " << _current_state->name() << std::endl;
-        // }
     }
+    void setStartState(S* start_state)
+    {
+        if(!start_state || !_states.count(start_state)) {
+            throw std::runtime_error{"invalid state"};
+        }
+        _current_state = start_state;
+    }
+    std::string const& currSateName() const {return _current_state->name();}
 private:
-    C* _context;
+    std::shared_ptr<C> _context;
     S* _current_state;
     std::unordered_set<S*> _states;
     Queue<E> _queue;
     std::thread _thread;
-    bool _continue_flag;
 };
 
 }//namespace fsm
